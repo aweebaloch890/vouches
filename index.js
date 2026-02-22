@@ -13,7 +13,7 @@ const fs = require("fs");
 
 // ================= CONFIG =================
 const config = {
-    token: "YOUR_BOT_TOKEN",
+   
     logChannel: "LOG_CHANNEL_ID",
     vouchChannel: "VOUCH_CHANNEL_ID"
 };
