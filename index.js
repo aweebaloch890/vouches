@@ -14,8 +14,8 @@ const fs = require("fs");
 // ================= CONFIG =================
 const config = {
    
-    logChannel: "LOG_CHANNEL_ID",
-    vouchChannel: "VOUCH_CHANNEL_ID"
+    logChannel: "1475245949285564496",
+    vouchChannel: "1403799364706767019"
 };
 
 // ==========================================
