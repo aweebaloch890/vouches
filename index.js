@@ -139,41 +139,54 @@ client.on("messageCreate", async (message) => {
         message.reply(`⚠ ${member.user.tag} warned. Total: ${warns[member.id].length}`);
     }
 
-    // ===== VOUCH =====
-    if (command === "vouch") {
-        const mention = message.mentions.users.first();
-        const parts = message.content.split("|");
-        if (!mention || parts.length < 4)
-            return message.reply("Use: !vouch @user | product | rating | reason");
+  // ===== VOUCH =====
+if (command === "vouch") {
 
-        const product = parts[1].trim();
-        const rating = parseInt(parts[2].trim());
-        const reason = parts[3].trim();
+    const seller = message.mentions.users.first();
+    const parts = message.content.split("|");
 
-        const stars = "⭐".repeat(rating);
-        const vouchID = Math.random().toString(36).substring(2, 8).toUpperCase();
+    if (!seller || parts.length < 5)
+        return message.reply("Use:\n!vouch @seller | product | price | rating(1-5) | reason");
 
-        const embed = new EmbedBuilder()
-            .setColor("#8A2BE2")
-            .setTitle("🛍️ New Vouch")
-            .addFields(
-                { name: "Seller", value: `${mention}`, inline: true },
-                { name: "Product", value: product, inline: true },
-                { name: "Rating", value: `${stars}` },
-                { name: "Reason", value: reason },
-                { name: "Vouch ID", value: vouchID }
-            );
+    const product = parts[1].trim();
+    const price = parts[2].trim();
+    const rating = parseInt(parts[3].trim());
+    const reason = parts[4].trim() || "No reason provided.";
 
-        const channel = client.channels.cache.get(VOUCH_CHANNEL_ID);
-        if (channel) channel.send({ embeds: [embed] });
+    if (rating < 1 || rating > 5)
+        return message.reply("Rating must be between 1-5");
 
-        const data = JSON.parse(fs.readFileSync("./vouches.json"));
-        if (!data[mention.id]) data[mention.id] = { count: 0 };
-        data[mention.id].count++;
-        fs.writeFileSync("./vouches.json", JSON.stringify(data, null, 2));
+    const stars = "⭐".repeat(rating) + ` (${rating}/5)`;
+    const vouchID = Math.random().toString(36).substring(2, 8).toUpperCase();
 
-        message.reply("✅ Vouch submitted!");
-    }
+    const embed = new EmbedBuilder()
+        .setColor("#2B2D31")
+        .setTitle("🛍️ • New Vouch Recorded!")
+        .addFields(
+            { name: "🛒 Product", value: product, inline: true },
+            { name: "💲 Price", value: price, inline: true },
+            { name: "👤 Seller", value: `${seller}`, inline: false },
+            { name: "⭐ Rating", value: stars, inline: false },
+            { name: "📝 Reason", value: reason, inline: false },
+            { name: "🔎 Vouched By", value: `${message.author}`, inline: true },
+            { name: "🆔 Vouch ID", value: vouchID, inline: true }
+        )
+        .setFooter({ text: `Force Voucher • ${new Date().toLocaleString()}` });
+
+    const channel = client.channels.cache.get(VOUCH_CHANNEL_ID);
+    if (channel) channel.send({ embeds: [embed] });
+
+    // ===== SAVE DATA =====
+    const data = JSON.parse(fs.readFileSync("./vouches.json"));
+    if (!data[seller.id]) data[seller.id] = { count: 0, totalStars: 0 };
+
+    data[seller.id].count += 1;
+    data[seller.id].totalStars += rating;
+
+    fs.writeFileSync("./vouches.json", JSON.stringify(data, null, 2));
+
+    message.reply("✅ Vouch submitted successfully!");
+}
 
     // ===== LEADERBOARD =====
     if (command === "leaderboard") {
