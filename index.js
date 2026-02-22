@@ -150,16 +150,20 @@ client.on("interactionCreate", async interaction => {
         const stars = "⭐".repeat(rating) + ` (${rating}/5)`;
         const vouchID = Math.random().toString(36).substring(2, 8).toUpperCase();
 
+        // PROPER DISCORD MENTION FORMAT
+        const sellerMention = `<@${seller.id}>`;
+        const voucherMention = `<@${interaction.user.id}>`;
+
         const embed = new EmbedBuilder()
             .setColor("#2B2D31")
             .setTitle("💗 • New Vouch Recorded!")
             .addFields(
                 { name: "🛒 Product", value: product, inline: true },
                 { name: "💲 Price", value: price, inline: true },
-                { name: "👤 Seller", value: `${seller}`, inline: false },
+                { name: "👤 Seller", value: sellerMention, inline: false },
                 { name: "⭐ Rating", value: stars, inline: false },
                 { name: "📝 Reason", value: reason, inline: false },
-                { name: "🙋 Vouched By", value: `${interaction.user}`, inline: true },
+                { name: "🙋 Vouched By", value: voucherMention, inline: true },
                 { name: "🆔 Vouch ID", value: vouchID, inline: true }
             )
             .setFooter({ text: "Force Voucher" });
@@ -174,9 +178,9 @@ client.on("interactionCreate", async interaction => {
         const channel = client.channels.cache.get(VOUCH_CHANNEL_ID);
         if (channel) {
             await channel.send({
-                content: `**Seller:** ${seller} | **Vouched By:** ${interaction.user}`,
                 embeds: [embed],
-                components: [row]
+                components: [row],
+                allowedMentions: { parse: ["users"] }
             });
         }
 
