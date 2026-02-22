@@ -6,7 +6,10 @@ const {
     EmbedBuilder,
     SlashCommandBuilder,
     Routes,
-    REST
+    REST,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle
 } = require("discord.js");
 
 const fs = require("fs");
@@ -23,8 +26,7 @@ const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.MessageContent
+        GatewayIntentBits.GuildMembers
     ],
     partials: [Partials.Channel]
 });
@@ -36,12 +38,12 @@ if (!fs.existsSync("./vouches.json"))
 // ================= REGISTER SLASH COMMANDS =================
 const commands = [
 
-    // PUBLIC VOUCH (Everyone Can See)
+    // PUBLIC VOUCH
     new SlashCommandBuilder().setName("vouch")
-        .setDescription("Give a vouch to a seller")
+        .setDescription("Submit a vouch for a seller")
         .addUserOption(option =>
             option.setName("seller")
-                .setDescription("Seller user")
+                .setDescription("Select the seller")
                 .setRequired(true))
         .addStringOption(option =>
             option.setName("product")
@@ -53,14 +55,14 @@ const commands = [
                 .setRequired(true))
         .addIntegerOption(option =>
             option.setName("rating")
-                .setDescription("Rating 1-5")
+                .setDescription("Rating (1-5)")
                 .setRequired(true))
         .addStringOption(option =>
             option.setName("reason")
-                .setDescription("Reason")
+                .setDescription("Reason for the review")
                 .setRequired(false)),
 
-    // ADMIN ONLY COMMANDS (Hidden)
+    // ADMIN COMMANDS
     new SlashCommandBuilder().setName("clear")
         .setDescription("Clear messages")
         .addIntegerOption(option =>
@@ -86,7 +88,7 @@ const commands = [
         .setDefaultMemberPermissions(0),
 
     new SlashCommandBuilder().setName("mute")
-        .setDescription("Mute user (5 min)")
+        .setDescription("Mute user (5 minutes)")
         .addUserOption(option =>
             option.setName("user")
                 .setDescription("User")
@@ -135,7 +137,7 @@ client.on("interactionCreate", async interaction => {
 
     const { commandName } = interaction;
 
-    // ================= PUBLIC VOUCH =================
+    // ================= VOUCH COMMAND =================
     if (commandName === "vouch") {
 
         const seller = interaction.options.getUser("seller");
@@ -145,9 +147,9 @@ client.on("interactionCreate", async interaction => {
         const reason = interaction.options.getString("reason") || "No reason provided.";
 
         if (rating < 1 || rating > 5)
-            return interaction.reply({ content: "❌ Rating must be 1-5.", ephemeral: true });
+            return interaction.reply({ content: "Rating must be between 1 and 5.", ephemeral: true });
 
-        const stars = "⭐".repeat(rating);
+        const stars = "⭐".repeat(rating) + ` (${rating}/5)`;
         const vouchID = Math.random().toString(36).substring(2, 8).toUpperCase();
 
         const embed = new EmbedBuilder()
@@ -156,58 +158,75 @@ client.on("interactionCreate", async interaction => {
             .addFields(
                 { name: "🛒 Product", value: product, inline: true },
                 { name: "💲 Price", value: price, inline: true },
-                { name: "👤 Seller", value: `${seller}` },
-                { name: "⭐ Rating", value: stars },
-                { name: "📝 Reason", value: reason },
-                { name: "🆔 Vouch ID", value: vouchID }
-            );
+                { name: "👤 Seller", value: `${seller}`, inline: false },
+                { name: "⭐ Rating", value: stars, inline: false },
+                { name: "📝 Reason", value: reason, inline: false },
+                { name: "🙋 Vouched By", value: `${interaction.user}`, inline: true },
+                { name: "🆔 Vouch ID", value: vouchID, inline: true }
+            )
+            .setFooter({ text: "Force Voucher" });
+
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setLabel("Submit Review")
+                .setStyle(ButtonStyle.Primary)
+                .setCustomId("review_button")
+        );
 
         const channel = client.channels.cache.get(VOUCH_CHANNEL_ID);
-        if (channel) channel.send({ embeds: [embed] });
+        if (channel) {
+            await channel.send({
+                embeds: [embed],
+                components: [row]
+            });
+        }
 
-        return interaction.reply({ content: "✅ Vouch submitted!", ephemeral: true });
+        return interaction.reply({
+            content: "Your vouch has been successfully submitted.",
+            ephemeral: true
+        });
     }
 
-    // ================= ROLE CHECK FOR ADMIN COMMANDS =================
+    // ================= ADMIN ROLE CHECK =================
     if (!interaction.member.roles.cache.has(ADMIN_ROLE_ID)) {
-        return interaction.reply({ content: "❌ You don't have permission.", ephemeral: true });
+        return interaction.reply({ content: "You do not have permission to use this command.", ephemeral: true });
     }
 
     if (commandName === "clear") {
         const amount = interaction.options.getInteger("amount");
         await interaction.channel.bulkDelete(amount, true);
-        return interaction.reply({ content: `✅ Deleted ${amount} messages`, ephemeral: true });
+        return interaction.reply({ content: `Deleted ${amount} messages.`, ephemeral: true });
     }
 
     if (commandName === "ban") {
         const user = interaction.options.getUser("user");
         await interaction.guild.members.ban(user.id);
-        return interaction.reply(`🔨 ${user.tag} banned.`);
+        return interaction.reply(`${user.tag} has been banned.`);
     }
 
     if (commandName === "unban") {
         const id = interaction.options.getString("userid");
         await interaction.guild.members.unban(id);
-        return interaction.reply(`✅ User unbanned.`);
+        return interaction.reply(`User has been unbanned.`);
     }
 
     if (commandName === "mute") {
         const member = interaction.options.getMember("user");
         await member.timeout(5 * 60000);
-        return interaction.reply(`🔇 Muted for 5 minutes.`);
+        return interaction.reply(`User muted for 5 minutes.`);
     }
 
     if (commandName === "unmute") {
         const member = interaction.options.getMember("user");
         await member.timeout(null);
-        return interaction.reply(`✅ Timeout removed.`);
+        return interaction.reply(`Timeout removed.`);
     }
 
     if (commandName === "timeout") {
         const member = interaction.options.getMember("user");
         const minutes = interaction.options.getInteger("minutes");
         await member.timeout(minutes * 60000);
-        return interaction.reply(`⏳ Timeout ${minutes} minutes.`);
+        return interaction.reply(`User timed out for ${minutes} minutes.`);
     }
 });
 
