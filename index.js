@@ -38,7 +38,6 @@ if (!fs.existsSync("./vouches.json"))
 // ================= REGISTER SLASH COMMANDS =================
 const commands = [
 
-    // PUBLIC VOUCH
     new SlashCommandBuilder().setName("vouch")
         .setDescription("Submit a vouch for a seller")
         .addUserOption(option =>
@@ -62,7 +61,6 @@ const commands = [
                 .setDescription("Reason for the review")
                 .setRequired(false)),
 
-    // ADMIN COMMANDS
     new SlashCommandBuilder().setName("clear")
         .setDescription("Clear messages")
         .addIntegerOption(option =>
@@ -137,7 +135,7 @@ client.on("interactionCreate", async interaction => {
 
     const { commandName } = interaction;
 
-    // ================= VOUCH COMMAND =================
+    // ================= VOUCH =================
     if (commandName === "vouch") {
 
         const seller = interaction.options.getUser("seller");
@@ -170,12 +168,13 @@ client.on("interactionCreate", async interaction => {
             new ButtonBuilder()
                 .setLabel("Submit Review")
                 .setStyle(ButtonStyle.Primary)
-                .setCustomId("review_button")
+                .setCustomId("submit_review")
         );
 
         const channel = client.channels.cache.get(VOUCH_CHANNEL_ID);
         if (channel) {
             await channel.send({
+                content: `**Seller:** ${seller} | **Vouched By:** ${interaction.user}`,
                 embeds: [embed],
                 components: [row]
             });
@@ -230,8 +229,6 @@ client.on("interactionCreate", async interaction => {
     }
 });
 
-
-// Keep Alive
 require("http").createServer((req, res) => {
     res.end("Bot Running");
 }).listen(3000);
