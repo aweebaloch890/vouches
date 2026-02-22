@@ -32,18 +32,78 @@ const client = new Client({
 if (!fs.existsSync("./warns.json")) fs.writeFileSync("./warns.json", "{}");
 if (!fs.existsSync("./vouches.json")) fs.writeFileSync("./vouches.json", "{}");
 
-// ===== READY =====
-client.once("clientReady", () => {
+// ================= READY =================
+client.once("clientReady", async () => {
     console.log(`✅ Logged in as ${client.user.tag}`);
+
+    // Register Slash Command
+    await client.application.commands.set([
+        {
+            name: "vouch",
+            description: "Submit a vouch",
+            options: [
+                { name: "product", description: "Product name", type: 3, required: true },
+                { name: "price", description: "Product price", type: 3, required: true },
+                { name: "seller", description: "Select seller", type: 6, required: true },
+                { name: "rating", description: "Rating 1-5", type: 4, required: true, min_value: 1, max_value: 5 },
+                { name: "reason", description: "Reason", type: 3, required: false }
+            ]
+        }
+    ]);
 });
 
-// ===== LOG FUNCTION =====
+// ================= LOG FUNCTION =================
 function sendLog(guild, embed) {
     const channel = guild.channels.cache.get(LOG_CHANNEL_ID);
     if (channel) channel.send({ embeds: [embed] });
 }
 
-// ===== MESSAGE EVENTS =====
+// ================= SLASH COMMAND =================
+client.on("interactionCreate", async (interaction) => {
+    if (!interaction.isChatInputCommand()) return;
+
+    if (interaction.commandName === "vouch") {
+
+        const product = interaction.options.getString("product");
+        const price = interaction.options.getString("price");
+        const seller = interaction.options.getUser("seller");
+        const rating = interaction.options.getInteger("rating");
+        const reason = interaction.options.getString("reason") || "No reason provided.";
+
+        const stars = "💗".repeat(rating) + ` (${rating}/5)`;
+        const vouchID = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+        const embed = new EmbedBuilder()
+            .setColor("#2B2D31")
+            .setTitle("💗 • New Vouch Recorded!")
+            .addFields(
+                { name: "🛒 Product", value: product, inline: true },
+                { name: "💲 Price", value: price, inline: true },
+                { name: "👤 Seller", value: `${seller}`, inline: false },
+                { name: "⭐ Rating", value: stars, inline: false },
+                { name: "📝 Reason", value: reason, inline: false },
+                { name: "🔎 Vouched By", value: `${interaction.user}`, inline: true },
+                { name: "🆔 Vouch ID", value: vouchID, inline: true }
+            )
+            .setFooter({ text: "Force Voucher" }); // Timestamp removed
+
+        const channel = client.channels.cache.get(VOUCH_CHANNEL_ID);
+        if (channel) channel.send({ embeds: [embed] });
+
+        // Save Data
+        const data = JSON.parse(fs.readFileSync("./vouches.json"));
+        if (!data[seller.id]) data[seller.id] = { count: 0, totalStars: 0 };
+
+        data[seller.id].count += 1;
+        data[seller.id].totalStars += rating;
+
+        fs.writeFileSync("./vouches.json", JSON.stringify(data, null, 2));
+
+        await interaction.reply({ content: "✅ Vouch submitted!", ephemeral: true });
+    }
+});
+
+// ================= MESSAGE EVENTS =================
 client.on("messageCreate", async (message) => {
     if (message.author.bot) return;
 
@@ -57,10 +117,8 @@ client.on("messageCreate", async (message) => {
 
     // ===== ANTI SPAM =====
     if (!client.spam) client.spam = {};
-    const now = Date.now();
-
     if (!client.spam[message.author.id]) {
-        client.spam[message.author.id] = { count: 1, time: now };
+        client.spam[message.author.id] = { count: 1 };
     } else {
         client.spam[message.author.id].count++;
         if (client.spam[message.author.id].count >= 6) {
@@ -113,81 +171,6 @@ client.on("messageCreate", async (message) => {
         );
     }
 
-    // ===== TIMEOUT =====
-    if (command === "timeout") {
-        const member = message.mentions.members.first();
-        const minutes = parseInt(args[1]);
-        if (!member || isNaN(minutes))
-            return message.reply("Use: !timeout @user 5");
-
-        await member.timeout(minutes * 60000).catch(() => {});
-        message.reply(`🔇 ${member.user.tag} muted for ${minutes} minutes.`);
-    }
-
-    // ===== WARN =====
-    if (command === "warn") {
-        const member = message.mentions.members.first();
-        const reason = args.slice(1).join(" ");
-        if (!member || !reason)
-            return message.reply("Use: !warn @user reason");
-
-        const warns = JSON.parse(fs.readFileSync("./warns.json"));
-        if (!warns[member.id]) warns[member.id] = [];
-        warns[member.id].push(reason);
-        fs.writeFileSync("./warns.json", JSON.stringify(warns, null, 2));
-
-        message.reply(`⚠ ${member.user.tag} warned. Total: ${warns[member.id].length}`);
-    }
-
-  // ===== VOUCH =====
-if (command === "vouch") {
-
-    const seller = message.mentions.users.first();
-    const parts = message.content.split("|");
-
-    if (!seller || parts.length < 5)
-        return message.reply("Use:\n!vouch @seller | product | price | rating(1-5) | reason");
-
-    const product = parts[1].trim();
-    const price = parts[2].trim();
-    const rating = parseInt(parts[3].trim());
-    const reason = parts[4].trim() || "No reason provided.";
-
-    if (rating < 1 || rating > 5)
-        return message.reply("Rating must be between 1-5");
-
-    const stars = "⭐".repeat(rating) + ` (${rating}/5)`;
-    const vouchID = Math.random().toString(36).substring(2, 8).toUpperCase();
-
-    const embed = new EmbedBuilder()
-        .setColor("#2B2D31")
-        .setTitle("🛍️ • New Vouch Recorded!")
-        .addFields(
-            { name: "🛒 Product", value: product, inline: true },
-            { name: "💲 Price", value: price, inline: true },
-            { name: "👤 Seller", value: `${seller}`, inline: false },
-            { name: "⭐ Rating", value: stars, inline: false },
-            { name: "📝 Reason", value: reason, inline: false },
-            { name: "🔎 Vouched By", value: `${message.author}`, inline: true },
-            { name: "🆔 Vouch ID", value: vouchID, inline: true }
-        )
-        .setFooter({ text: `Force Voucher • ${new Date().toLocaleString()}` });
-
-    const channel = client.channels.cache.get(VOUCH_CHANNEL_ID);
-    if (channel) channel.send({ embeds: [embed] });
-
-    // ===== SAVE DATA =====
-    const data = JSON.parse(fs.readFileSync("./vouches.json"));
-    if (!data[seller.id]) data[seller.id] = { count: 0, totalStars: 0 };
-
-    data[seller.id].count += 1;
-    data[seller.id].totalStars += rating;
-
-    fs.writeFileSync("./vouches.json", JSON.stringify(data, null, 2));
-
-    message.reply("✅ Vouch submitted successfully!");
-}
-
     // ===== LEADERBOARD =====
     if (command === "leaderboard") {
         const data = JSON.parse(fs.readFileSync("./vouches.json"));
@@ -221,7 +204,7 @@ if (command === "vouch") {
     }
 });
 
-// ===== MESSAGE DELETE LOG =====
+// ===== DELETE LOG =====
 client.on("messageDelete", (message) => {
     if (!message.guild || message.author?.bot) return;
     sendLog(message.guild,
