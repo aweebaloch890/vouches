@@ -31,9 +31,6 @@ const client = new Client({
     partials: [Partials.Channel]
 });
 
-if (!fs.existsSync("./vouches.json"))
-    fs.writeFileSync("./vouches.json", "{}");
-
 
 // ================= REGISTER SLASH COMMANDS =================
 const commands = [
@@ -150,7 +147,7 @@ client.on("interactionCreate", async interaction => {
         const stars = "⭐".repeat(rating) + ` (${rating}/5)`;
         const vouchID = Math.random().toString(36).substring(2, 8).toUpperCase();
 
-        // PROPER DISCORD MENTION FORMAT
+        // Proper mentions
         const sellerMention = `<@${seller.id}>`;
         const voucherMention = `<@${interaction.user.id}>`;
 
@@ -166,6 +163,7 @@ client.on("interactionCreate", async interaction => {
                 { name: "🙋 Vouched By", value: voucherMention, inline: true },
                 { name: "🆔 Vouch ID", value: vouchID, inline: true }
             )
+            .setTimestamp() // 🔥 auto timestamp like your picture
             .setFooter({ text: "Force Voucher" });
 
         const row = new ActionRowBuilder().addComponents(
@@ -180,19 +178,21 @@ client.on("interactionCreate", async interaction => {
             await channel.send({
                 embeds: [embed],
                 components: [row],
-                allowedMentions: { parse: ["users"] }
+                allowedMentions: {
+                    users: [seller.id, interaction.user.id] // ✅ Proper ping
+                }
             });
         }
 
         return interaction.reply({
-            content: "Your vouch has been successfully submitted.",
+            content: "✅ Your vouch has been successfully submitted.",
             ephemeral: true
         });
     }
 
     // ================= ADMIN ROLE CHECK =================
     if (!interaction.member.roles.cache.has(ADMIN_ROLE_ID)) {
-        return interaction.reply({ content: "You do not have permission to use this command.", ephemeral: true });
+        return interaction.reply({ content: "❌ You do not have permission to use this command.", ephemeral: true });
     }
 
     if (commandName === "clear") {
