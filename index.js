@@ -3,7 +3,6 @@ const {
     Client,
     GatewayIntentBits,
     Partials,
-    PermissionFlagsBits,
     EmbedBuilder,
     SlashCommandBuilder,
     Routes,
@@ -17,8 +16,8 @@ if (!process.env.TOKEN || !process.env.CLIENT_ID) {
     process.exit(1);
 }
 
-const PREFIX = "<<";
 const VOUCH_CHANNEL_ID = "1403799364706767019";
+const ADMIN_ROLE_ID = "1397441836330651798";
 
 const client = new Client({
     intents: [
@@ -36,40 +35,71 @@ if (!fs.existsSync("./vouches.json"))
 
 // ================= REGISTER SLASH COMMANDS =================
 const commands = [
+
+    // PUBLIC VOUCH (Everyone Can See)
+    new SlashCommandBuilder().setName("vouch")
+        .setDescription("Give a vouch to a seller")
+        .addUserOption(option =>
+            option.setName("seller")
+                .setDescription("Seller user")
+                .setRequired(true))
+        .addStringOption(option =>
+            option.setName("product")
+                .setDescription("Product name")
+                .setRequired(true))
+        .addStringOption(option =>
+            option.setName("price")
+                .setDescription("Product price")
+                .setRequired(true))
+        .addIntegerOption(option =>
+            option.setName("rating")
+                .setDescription("Rating 1-5")
+                .setRequired(true))
+        .addStringOption(option =>
+            option.setName("reason")
+                .setDescription("Reason")
+                .setRequired(false)),
+
+    // ADMIN ONLY COMMANDS (Hidden)
     new SlashCommandBuilder().setName("clear")
         .setDescription("Clear messages")
         .addIntegerOption(option =>
             option.setName("amount")
                 .setDescription("Number of messages")
-                .setRequired(true)),
+                .setRequired(true))
+        .setDefaultMemberPermissions(0),
 
     new SlashCommandBuilder().setName("ban")
         .setDescription("Ban a user")
         .addUserOption(option =>
             option.setName("user")
                 .setDescription("User to ban")
-                .setRequired(true)),
+                .setRequired(true))
+        .setDefaultMemberPermissions(0),
 
     new SlashCommandBuilder().setName("unban")
         .setDescription("Unban a user")
         .addStringOption(option =>
             option.setName("userid")
-                .setDescription("User ID to unban")
-                .setRequired(true)),
+                .setDescription("User ID")
+                .setRequired(true))
+        .setDefaultMemberPermissions(0),
 
     new SlashCommandBuilder().setName("mute")
-        .setDescription("Mute user for 5 minutes")
+        .setDescription("Mute user (5 min)")
         .addUserOption(option =>
             option.setName("user")
-                .setDescription("User to mute")
-                .setRequired(true)),
+                .setDescription("User")
+                .setRequired(true))
+        .setDefaultMemberPermissions(0),
 
     new SlashCommandBuilder().setName("unmute")
         .setDescription("Remove timeout")
         .addUserOption(option =>
             option.setName("user")
-                .setDescription("User to unmute")
-                .setRequired(true)),
+                .setDescription("User")
+                .setRequired(true))
+        .setDefaultMemberPermissions(0),
 
     new SlashCommandBuilder().setName("timeout")
         .setDescription("Timeout user")
@@ -81,6 +111,8 @@ const commands = [
             option.setName("minutes")
                 .setDescription("Minutes")
                 .setRequired(true))
+        .setDefaultMemberPermissions(0)
+
 ].map(cmd => cmd.toJSON());
 
 client.once("clientReady", async () => {
@@ -97,29 +129,23 @@ client.once("clientReady", async () => {
 });
 
 
-// ================= PREFIX VOUCH =================
-client.on("messageCreate", async (message) => {
-    if (message.author.bot) return;
-    if (!message.content.startsWith(PREFIX)) return;
+// ================= SLASH HANDLER =================
+client.on("interactionCreate", async interaction => {
+    if (!interaction.isChatInputCommand()) return;
 
-    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-    const command = args.shift().toLowerCase();
+    const { commandName } = interaction;
 
-    if (command === "vouch") {
+    // ================= PUBLIC VOUCH =================
+    if (commandName === "vouch") {
 
-        if (args.length < 4)
-            return message.reply("Usage: <<vouch @seller product price rating(1-5) reason");
+        const seller = interaction.options.getUser("seller");
+        const product = interaction.options.getString("product");
+        const price = interaction.options.getString("price");
+        const rating = interaction.options.getInteger("rating");
+        const reason = interaction.options.getString("reason") || "No reason provided.";
 
-        const seller = message.mentions.users.first();
-        if (!seller) return message.reply("❌ Mention seller.");
-
-        const product = args[1];
-        const price = args[2];
-        const rating = parseInt(args[3]);
-        const reason = args.slice(4).join(" ") || "No reason.";
-
-        if (isNaN(rating) || rating < 1 || rating > 5)
-            return message.reply("❌ Rating 1-5 only.");
+        if (rating < 1 || rating > 5)
+            return interaction.reply({ content: "❌ Rating must be 1-5.", ephemeral: true });
 
         const stars = "⭐".repeat(rating);
         const vouchID = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -139,20 +165,13 @@ client.on("messageCreate", async (message) => {
         const channel = client.channels.cache.get(VOUCH_CHANNEL_ID);
         if (channel) channel.send({ embeds: [embed] });
 
-        return message.reply("✅ Vouch submitted!");
+        return interaction.reply({ content: "✅ Vouch submitted!", ephemeral: true });
     }
-});
 
-
-// ================= SLASH COMMAND HANDLER =================
-client.on("interactionCreate", async interaction => {
-    if (!interaction.isChatInputCommand()) return;
-
-    // ADMIN CHECK
-    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator))
-        return interaction.reply({ content: "❌ Admin only.", ephemeral: true });
-
-    const { commandName } = interaction;
+    // ================= ROLE CHECK FOR ADMIN COMMANDS =================
+    if (!interaction.member.roles.cache.has(ADMIN_ROLE_ID)) {
+        return interaction.reply({ content: "❌ You don't have permission.", ephemeral: true });
+    }
 
     if (commandName === "clear") {
         const amount = interaction.options.getInteger("amount");
@@ -173,21 +192,21 @@ client.on("interactionCreate", async interaction => {
     }
 
     if (commandName === "mute") {
-        const user = interaction.options.getMember("user");
-        await user.timeout(5 * 60000);
+        const member = interaction.options.getMember("user");
+        await member.timeout(5 * 60000);
         return interaction.reply(`🔇 Muted for 5 minutes.`);
     }
 
     if (commandName === "unmute") {
-        const user = interaction.options.getMember("user");
-        await user.timeout(null);
+        const member = interaction.options.getMember("user");
+        await member.timeout(null);
         return interaction.reply(`✅ Timeout removed.`);
     }
 
     if (commandName === "timeout") {
-        const user = interaction.options.getMember("user");
+        const member = interaction.options.getMember("user");
         const minutes = interaction.options.getInteger("minutes");
-        await user.timeout(minutes * 60000);
+        await member.timeout(minutes * 60000);
         return interaction.reply(`⏳ Timeout ${minutes} minutes.`);
     }
 });
