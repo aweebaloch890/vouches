@@ -196,31 +196,30 @@ function generateEmbed(productName) {
 
     const product = products[productName];
 
-    let description = `
-/--------------------------------------------------------/
-/${productName} Restocked
-/--------------------------------------------------------/
+    let description = "```";
 
-Our product ${productName} has just been restocked!
-
-Buy Now
-/
-`;
+    description += "\n/--------------------------------------------------------/";
+    description += `\n/${productName} Restocked`;
+    description += "\n/--------------------------------------------------------/\n";
+    description += `\nOur product ${productName} has just been restocked!\n`;
+    description += "\nBuy Now\n";
 
     product.variants.forEach(v => {
 
-        description += `
-/--------------------------------------------------------/
-Variant                                 Price                  Stock
-${v.name.padEnd(25, " ")}${v.price.padEnd(15, " ")}${v.stock}
-/--------------------------------------------------------/
-`;
+        description += "\n/--------------------------------------------------------/";
+        description += "\nVariant               Price        Stock";
+        description += `\n${v.name.padEnd(20," ")} ${v.price.padEnd(10," ")} ${v.stock}`;
+        description += "\n/--------------------------------------------------------/\n";
+
     });
+
+    description += "```";
 
     return new EmbedBuilder()
         .setColor("#2b2d31")
         .setDescription(description)
         .setImage(product.image)
+        .setFooter({ text: "Tec Trader" })
         .setTimestamp();
 }
 
