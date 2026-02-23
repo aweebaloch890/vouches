@@ -196,21 +196,34 @@ function generateEmbed(productName) {
 
     const product = products[productName];
 
-    let description = `Our product **${productName}** has just been restocked!\n`;
-    description += `[Buy Now](https://discord.com/channels/${process.env.GUILD_ID}/${BUY_CHANNEL_ID})\n\n`;
+    // Header line
+    let table = `\`\`\`\n`;
+    table += `Variant                 Price      Stock\n`;
+    table += `---------------------------------------------\n`;
 
     product.variants.forEach(v => {
-        description += `**Variant**\n${v.name}\n`;
-        description += `**Price**\n${v.price}\n`;
-        description += `**Stock**\n${v.stock}\n\n`;
+
+        const name = v.name.padEnd(22, " ");
+        const price = v.price.padEnd(10, " ");
+        const stock = v.stock.toString().padEnd(5, " ");
+
+        table += `${name}${price}${stock}\n`;
     });
 
+    table += `\`\`\``;
+
     return new EmbedBuilder()
-        .setColor("#00ff7f")
+        .setColor("#00ff7f") // FS green line
         .setTitle(`${productName} Restocked`)
-        .setDescription(description)
+        .setDescription(
+`Our product **${productName}** has just been restocked!
+[Buy Now](https://discord.com/channels/${process.env.GUILD_ID}/${BUY_CHANNEL_ID})
+
+${table}`
+        )
         .setImage(product.image)
-        .setFooter({ text: "Force Shop" });
+        .setFooter({ text: "Tec Trader" })
+        .setTimestamp();
 }
 
 client.login(process.env.TOKEN);
