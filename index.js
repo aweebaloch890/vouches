@@ -25,18 +25,15 @@ const client = new Client({
     intents: [GatewayIntentBits.Guilds]
 });
 
-// ===== Load JSON =====
 let products = {};
 if (fs.existsSync(DATA_FILE)) {
     products = JSON.parse(fs.readFileSync(DATA_FILE));
 }
 
-// ===== Save JSON =====
 function saveProducts() {
     fs.writeFileSync(DATA_FILE, JSON.stringify(products, null, 2));
 }
 
-// ===== Slash Command =====
 const commands = [
     new SlashCommandBuilder()
         .setName("restock")
@@ -60,7 +57,6 @@ const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
 client.on("interactionCreate", async interaction => {
 
-    // ===== /restock =====
     if (interaction.isChatInputCommand()) {
         if (interaction.commandName === "restock") {
 
@@ -90,7 +86,6 @@ client.on("interactionCreate", async interaction => {
                 .setCustomId("variants")
                 .setLabel("Variants (Name,Price,Stock per line)")
                 .setStyle(TextInputStyle.Paragraph)
-                .setPlaceholder("1K Followers,3€,10\n5K Followers,10€,5")
                 .setRequired(true);
 
             modal.addComponents(
@@ -104,10 +99,8 @@ client.on("interactionCreate", async interaction => {
         }
     }
 
-    // ===== Modal Submit =====
     if (interaction.isModalSubmit()) {
 
-        // ===== Create Restock =====
         if (interaction.customId === "restock_modal") {
 
             const productName = interaction.fields.getTextInputValue("product");
@@ -137,11 +130,11 @@ client.on("interactionCreate", async interaction => {
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`buy_${productName}`)
-                    .setLabel("🔥 Buy Now")
-                    .setStyle(ButtonStyle.Success),
+                    .setLabel("Buy Now")
+                    .setStyle(ButtonStyle.Primary),
                 new ButtonBuilder()
                     .setCustomId(`edit_${productName}`)
-                    .setLabel("✏ Edit Stock")
+                    .setLabel("Edit Stock")
                     .setStyle(ButtonStyle.Secondary)
             );
 
@@ -159,54 +152,20 @@ client.on("interactionCreate", async interaction => {
                 ephemeral: true
             });
         }
-
-        // ===== Edit Stock =====
-        if (interaction.customId.startsWith("edit_modal_")) {
-
-            const productName = interaction.customId.replace("edit_modal_", "");
-            const variantInput = interaction.fields.getTextInputValue("variants");
-
-            const parsedVariants = variantInput.split("\n").map(line => {
-                const [name, price, stock] = line.split(",");
-                return {
-                    name: name.trim(),
-                    price: price.trim(),
-                    stock: parseInt(stock.trim())
-                };
-            });
-
-            products[productName].variants = parsedVariants;
-            saveProducts();
-
-            const embed = generateEmbed(productName);
-
-            const channel = await client.channels.fetch(products[productName].channelId);
-            const msg = await channel.messages.fetch(products[productName].messageId);
-
-            await msg.edit({ embeds: [embed] });
-
-            await interaction.reply({
-                content: "Stock Updated ✅",
-                ephemeral: true
-            });
-        }
     }
 
-    // ===== Buttons =====
     if (interaction.isButton()) {
 
-        // ===== BUY BUTTON =====
         if (interaction.customId.startsWith("buy_")) {
 
             const buyChannel = await client.channels.fetch(BUY_CHANNEL_ID);
 
             await interaction.reply({
-                content: `🛒 Please go to ${buyChannel} to complete your purchase.`,
+                content: `Please go to ${buyChannel} to complete your purchase.`,
                 ephemeral: true
             });
         }
 
-        // ===== EDIT BUTTON =====
         if (interaction.customId.startsWith("edit_")) {
 
             if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator))
@@ -232,24 +191,26 @@ client.on("interactionCreate", async interaction => {
 
 });
 
-// ===== Embed Generator =====
+// ===== SAME CLEAN EMBED STYLE =====
 function generateEmbed(productName) {
 
     const product = products[productName];
 
-    let text = `**Variant** | **Price** | **Stock**\n\n`;
+    let description = `Our product **${productName}** has just been restocked!\n`;
+    description += `[Buy Now](https://discord.com/channels/${process.env.GUILD_ID}/${BUY_CHANNEL_ID})\n\n`;
 
     product.variants.forEach(v => {
-        text += `${v.name} | ${v.price} | ${v.stock}\n`;
+        description += `**Variant**\n${v.name}\n`;
+        description += `**Price**\n${v.price}\n`;
+        description += `**Stock**\n${v.stock}\n\n`;
     });
 
     return new EmbedBuilder()
-        .setColor("#2b2d31")
+        .setColor("#00ff7f")
         .setTitle(`${productName} Restocked`)
-        .setDescription(text)
+        .setDescription(description)
         .setImage(product.image)
-        .setFooter({ text: "Tec Trader" })
-        .setTimestamp();
+        .setFooter({ text: "Force Shop" });
 }
 
 client.login(process.env.TOKEN);
