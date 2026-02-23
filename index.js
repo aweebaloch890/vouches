@@ -248,7 +248,7 @@ function generateEmbed(productName) {
         .setTitle(`${productName} Restocked`)
         .setDescription(text)
         .setImage(product.image)
-        .setFooter({ text: "Force Shop" })
+        .setFooter({ text: "Tec Trader" })
         .setTimestamp();
 }
 
