@@ -201,27 +201,32 @@ function generateEmbed(productName) {
 ${productName} Restocked
 --------------------------------------------------------
 
-Our product ${productName} has just been restocked!
+function generateEmbed(productName) {
 
-Buy Now
+    const product = products[productName];
 
-`;
+    let description = `Our product **${productName}** has just been restocked!\n\n`;
 
     product.variants.forEach(v => {
 
-        description += `
---------------------------------------------------------
-Variant                                 Price                  Stock
-${v.name.padEnd(25, " ")}${v.price.padEnd(15, " ")}${v.stock}
---------------------------------------------------------
-`;
+        description += 
+`\`\`\`
+Variant                              Price        Stock
+
+${v.name.padEnd(35, " ")}${v.price.padEnd(12, " ")}${v.stock}
+\`\`\`\n`;
+
     });
 
     return new EmbedBuilder()
-        .setColor("#2b2d31")
+        .setColor("#00b0f4") // blue like screenshot
+        .setTitle(productName)
         .setDescription(description)
         .setImage(product.image)
+        .setFooter({ text: "Tec Trader" })
         .setTimestamp();
 }
+
+
 
 client.login(process.env.TOKEN);
