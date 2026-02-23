@@ -196,33 +196,31 @@ function generateEmbed(productName) {
 
     const product = products[productName];
 
-    // Header line
-    let table = `\`\`\`\n`;
-    table += `Variant                 Price      Stock\n`;
-    table += `---------------------------------------------\n`;
+    let description = `
+/--------------------------------------------------------/
+/${productName} Restocked
+/--------------------------------------------------------/
+
+Our product ${productName} has just been restocked!
+
+Buy Now
+/
+`;
 
     product.variants.forEach(v => {
 
-        const name = v.name.padEnd(22, " ");
-        const price = v.price.padEnd(10, " ");
-        const stock = v.stock.toString().padEnd(5, " ");
-
-        table += `${name}${price}${stock}\n`;
+        description += `
+/--------------------------------------------------------/
+Variant                                 Price                  Stock
+${v.name.padEnd(25, " ")}${v.price.padEnd(15, " ")}${v.stock}
+/--------------------------------------------------------/
+`;
     });
 
-    table += `\`\`\``;
-
     return new EmbedBuilder()
-        .setColor("#00ff7f") // FS green line
-        .setTitle(`${productName} Restocked`)
-        .setDescription(
-`Our product **${productName}** has just been restocked!
-[Buy Now](https://discord.com/channels/${process.env.GUILD_ID}/${BUY_CHANNEL_ID})
-
-${table}`
-        )
+        .setColor("#2b2d31")
+        .setDescription(description)
         .setImage(product.image)
-        .setFooter({ text: "Tec Trader" })
         .setTimestamp();
 }
 
