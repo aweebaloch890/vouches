@@ -196,37 +196,25 @@ function generateEmbed(productName) {
 
     const product = products[productName];
 
-    let description = `
---------------------------------------------------------
-${productName} Restocked
---------------------------------------------------------
+    let description = "Our product **" + productName + "** has just been restocked!\n\n";
 
-function generateEmbed(productName) {
+    product.variants.forEach(function(v) {
 
-    const product = products[productName];
-
-    let description = `Our product **${productName}** has just been restocked!\n\n`;
-
-    product.variants.forEach(v => {
-
-        description += 
-`\`\`\`
-Variant                              Price        Stock
-
-${v.name.padEnd(35, " ")}${v.price.padEnd(12, " ")}${v.stock}
-\`\`\`\n`;
+        description += "```";
+        description += "\nVariant                              Price        Stock\n\n";
+        description += v.name.padEnd(35, " ") + v.price.padEnd(12, " ") + v.stock;
+        description += "\n```\n\n";
 
     });
 
     return new EmbedBuilder()
-        .setColor("#00b0f4") // blue like screenshot
+        .setColor("#00b0f4")
         .setTitle(productName)
         .setDescription(description)
         .setImage(product.image)
         .setFooter({ text: "Tec Trader" })
         .setTimestamp();
 }
-
 
 
 client.login(process.env.TOKEN);
