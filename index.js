@@ -34,6 +34,8 @@ function saveProducts() {
     fs.writeFileSync(DATA_FILE, JSON.stringify(products, null, 2));
 }
 
+/* ================= SLASH COMMAND ================= */
+
 const commands = [
     new SlashCommandBuilder()
         .setName("restock")
@@ -45,18 +47,25 @@ const commands = [
 const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
 (async () => {
-    await rest.put(
-        Routes.applicationGuildCommands(
-            process.env.CLIENT_ID,
-            process.env.GUILD_ID
-        ),
-        { body: commands }
-    );
-    console.log("Slash command registered ✅");
+    try {
+        await rest.put(
+            Routes.applicationGuildCommands(
+                process.env.CLIENT_ID,
+                process.env.GUILD_ID
+            ),
+            { body: commands }
+        );
+        console.log("Slash command registered ✅");
+    } catch (err) {
+        console.error(err);
+    }
 })();
+
+/* ================= INTERACTIONS ================= */
 
 client.on("interactionCreate", async interaction => {
 
+    /* ===== SLASH ===== */
     if (interaction.isChatInputCommand()) {
         if (interaction.commandName === "restock") {
 
@@ -99,68 +108,65 @@ client.on("interactionCreate", async interaction => {
         }
     }
 
-    if (interaction.isModalSubmit()) {
+    /* ===== CREATE RESTOCK ===== */
+    if (interaction.isModalSubmit() && interaction.customId === "restock_modal") {
 
-        if (interaction.customId === "restock_modal") {
+        const productName = interaction.fields.getTextInputValue("product");
+        const imageURL = interaction.fields.getTextInputValue("image");
+        const channelId = interaction.fields.getTextInputValue("channel");
+        const variantInput = interaction.fields.getTextInputValue("variants");
 
-            const productName = interaction.fields.getTextInputValue("product");
-            const imageURL = interaction.fields.getTextInputValue("image");
-            const channelId = interaction.fields.getTextInputValue("channel");
-            const variantInput = interaction.fields.getTextInputValue("variants");
-
-            const parsedVariants = variantInput.split("\n").map(line => {
-                const [name, price, stock] = line.split(",");
-                return {
-                    name: name.trim(),
-                    price: price.trim(),
-                    stock: parseInt(stock.trim())
-                };
-            });
-
-            products[productName] = {
-                image: imageURL,
-                variants: parsedVariants,
-                channelId
+        const parsedVariants = variantInput.split("\n").map(line => {
+            const [name, price, stock] = line.split(",");
+            return {
+                name: name.trim(),
+                price: price.trim(),
+                stock: parseInt(stock.trim())
             };
+        });
 
-            saveProducts();
+        products[productName] = {
+            image: imageURL,
+            variants: parsedVariants,
+            channelId
+        };
 
-            const embed = generateEmbed(productName);
+        saveProducts();
 
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`buy_${productName}`)
-                    .setLabel("Buy Now")
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId(`edit_${productName}`)
-                    .setLabel("Edit Stock")
-                    .setStyle(ButtonStyle.Secondary)
-            );
+        const embed = generateEmbed(productName);
 
-            const channel = await client.channels.fetch(channelId);
-            const msg = await channel.send({
-                embeds: [embed],
-                components: [row]
-            });
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`buy_${productName}`)
+                .setLabel("Buy Now")
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId(`edit_${productName}`)
+                .setLabel("Edit Stock")
+                .setStyle(ButtonStyle.Secondary)
+        );
 
-            products[productName].messageId = msg.id;
-            saveProducts();
+        const channel = await client.channels.fetch(channelId);
+        const msg = await channel.send({
+            embeds: [embed],
+            components: [row]
+        });
 
-            await interaction.reply({
-                content: "Restock Created ✅",
-                ephemeral: true
-            });
-        }
+        products[productName].messageId = msg.id;
+        saveProducts();
+
+        await interaction.reply({
+            content: "Restock Created ✅",
+            ephemeral: true
+        });
     }
 
+    /* ===== BUTTONS ===== */
     if (interaction.isButton()) {
 
         if (interaction.customId.startsWith("buy_")) {
-
             const buyChannel = await client.channels.fetch(BUY_CHANNEL_ID);
-
-            await interaction.reply({
+            return interaction.reply({
                 content: `Please go to ${buyChannel} to complete your purchase.`,
                 ephemeral: true
             });
@@ -184,14 +190,44 @@ client.on("interactionCreate", async interaction => {
                 .setRequired(true);
 
             modal.addComponents(new ActionRowBuilder().addComponents(stockInput));
-
             await interaction.showModal(modal);
         }
     }
 
+    /* ===== EDIT STOCK ===== */
+    if (interaction.isModalSubmit() && interaction.customId.startsWith("edit_modal_")) {
+
+        const productName = interaction.customId.replace("edit_modal_", "");
+        const variantInput = interaction.fields.getTextInputValue("variants");
+
+        const parsedVariants = variantInput.split("\n").map(line => {
+            const [name, price, stock] = line.split(",");
+            return {
+                name: name.trim(),
+                price: price.trim(),
+                stock: parseInt(stock.trim())
+            };
+        });
+
+        products[productName].variants = parsedVariants;
+        saveProducts();
+
+        const embed = generateEmbed(productName);
+
+        const channel = await client.channels.fetch(products[productName].channelId);
+        const message = await channel.messages.fetch(products[productName].messageId);
+
+        await message.edit({ embeds: [embed] });
+
+        await interaction.reply({
+            content: "Stock Updated ✅",
+            ephemeral: true
+        });
+    }
 });
 
-// ===== SAME CLEAN EMBED STYLE =====
+/* ================= EMBED ================= */
+
 function generateEmbed(productName) {
 
     const product = products[productName];
@@ -214,5 +250,11 @@ function generateEmbed(productName) {
         .setTimestamp();
 }
 
+client.once("ready", () => {
+    console.log(`Logged in as ${client.user.tag}`);
+});
+
+process.on("unhandledRejection", console.error);
+process.on("uncaughtException", console.error);
 
 client.login(process.env.TOKEN);
