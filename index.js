@@ -234,15 +234,21 @@ function generateEmbed(productName) {
 
     let description = "Our product **" + productName + "** has just been restocked!\n\n";
 
+    description += "```";
+    description += "\nVariant                          Price      Stock\n";
+    description += "-------------------------------------------------------\n";
+
     product.variants.forEach(function(v) {
 
-        description += "```";
-        description += "\n" + v.name;
-        description += "\nPrice: " + v.price;
-        description += "\nStock: " + v.stock;
-        description += "\n```\n\n";
+        const name = v.name.padEnd(32, " ");
+        const price = v.price.toString().padEnd(10, " ");
+        const stock = v.stock.toString();
+
+        description += name + price + stock + "\n";
 
     });
+
+    description += "```\n";
 
     return new EmbedBuilder()
         .setColor("#00b0f4")
