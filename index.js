@@ -1,7 +1,6 @@
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
-
 const {
     Client,
     GatewayIntentBits,
@@ -34,12 +33,50 @@ function saveProducts() {
     fs.writeFileSync(DATA_FILE, JSON.stringify(products, null, 2));
 }
 
-/* ================= SLASH COMMAND ================= */
+/* ================= EMBED GENERATOR ================= */
+function generateEmbed(productName) {
+    const data = products[productName];
+    if (!data) return new EmbedBuilder().setDescription("Product not found");
 
+    const embed = new EmbedBuilder()
+        .setColor(0x00FF00)                     // Green restock vibe
+        .setTitle(`${productName} Restocked! 🔥`)
+        .setURL("https://forceshop.cc/FORCESHOP")   // ← yahan apna real buy link daal sakta hai
+        .setDescription(
+            `Our product **${productName}** has just been **restocked**!\n` +
+            `Jaldi se grab kar lo – stock limited hai! 🚀\n\n` +
+            `**Buy Now →** https://forceshop.cc/FORCESHOP`
+        )
+        .setImage(data.image)                   // Product ki badi image (modal se aati hai)
+        .setThumbnail("https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png") // Optional
+        .setFooter({ 
+            text: "Force Shop • Restock Alert", 
+            iconURL: client.user.displayAvatarURL() 
+        })
+        .setTimestamp();
+
+    // Variants ko table style mein add kar rahe hain
+    data.variants.forEach((v, index) => {
+        embed.addFields(
+            { name: "Variant", value: v.name, inline: true },
+            { name: "Price",   value: v.price, inline: true },
+            { name: "Stock",   value: v.stock.toString(), inline: true }
+        );
+
+        // Har variant ke baad chhota separator (optional – agar bohot saare variants hain to achha lagta hai)
+        if (index < data.variants.length - 1) {
+            embed.addFields({ name: "\u200B", value: "\u200B", inline: false });
+        }
+    });
+
+    return embed;
+}
+
+/* ================= SLASH COMMAND ================= */
 const commands = [
     new SlashCommandBuilder()
         .setName("restock")
-        .setDescription("Create Restock")
+        .setDescription("Create Restock Announcement")
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
         .toJSON()
 ];
@@ -55,20 +92,17 @@ const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
             ),
             { body: commands }
         );
-        console.log("Slash command registered ✅");
+        console.log("Slash command /restock registered ✅");
     } catch (err) {
         console.error(err);
     }
 })();
 
 /* ================= INTERACTIONS ================= */
-
 client.on("interactionCreate", async interaction => {
-
-    /* ===== SLASH ===== */
+    /* ===== SLASH COMMAND ===== */
     if (interaction.isChatInputCommand()) {
         if (interaction.commandName === "restock") {
-
             const modal = new ModalBuilder()
                 .setCustomId("restock_modal")
                 .setTitle("Create Restock");
@@ -81,7 +115,7 @@ client.on("interactionCreate", async interaction => {
 
             const image = new TextInputBuilder()
                 .setCustomId("image")
-                .setLabel("Image URL")
+                .setLabel("Image URL (product box)")
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true);
 
@@ -93,8 +127,9 @@ client.on("interactionCreate", async interaction => {
 
             const variants = new TextInputBuilder()
                 .setCustomId("variants")
-                .setLabel("Variants (Name,Price,Stock per line)")
+                .setLabel("Variants (one per line: Name,Price,Stock)")
                 .setStyle(TextInputStyle.Paragraph)
+                .setPlaceholder("1K Followers,€3.00,16\n1K Likes,€2.50,8\n1K Views,€2.50,8")
                 .setRequired(true);
 
             modal.addComponents(
@@ -108,29 +143,35 @@ client.on("interactionCreate", async interaction => {
         }
     }
 
-    /* ===== CREATE RESTOCK ===== */
+    /* ===== MODAL SUBMIT → CREATE RESTOCK ===== */
     if (interaction.isModalSubmit() && interaction.customId === "restock_modal") {
+        await interaction.deferReply({ ephemeral: true });
 
-        const productName = interaction.fields.getTextInputValue("product");
-        const imageURL = interaction.fields.getTextInputValue("image");
-        const channelId = interaction.fields.getTextInputValue("channel");
+        const productName = interaction.fields.getTextInputValue("product").trim();
+        const imageURL    = interaction.fields.getTextInputValue("image").trim();
+        const channelId   = interaction.fields.getTextInputValue("channel").trim();
         const variantInput = interaction.fields.getTextInputValue("variants");
 
-        const parsedVariants = variantInput.split("\n").map(line => {
-            const [name, price, stock] = line.split(",");
-            return {
-                name: name.trim(),
-                price: price.trim(),
-                stock: parseInt(stock.trim())
-            };
-        });
+        const parsedVariants = variantInput
+            .split("\n")
+            .map(line => line.trim())
+            .filter(line => line.length > 0)
+            .map(line => {
+                const [name, price, stockStr] = line.split(",").map(part => part.trim());
+                const stock = parseInt(stockStr);
+                return {
+                    name: name || "Unknown",
+                    price: price || "€0.00",
+                    stock: isNaN(stock) ? 0 : stock
+                };
+            });
 
         products[productName] = {
             image: imageURL,
             variants: parsedVariants,
-            channelId
+            channelId,
+            createdAt: Date.now()
         };
-
         saveProducts();
 
         const embed = generateEmbed(productName);
@@ -146,125 +187,113 @@ client.on("interactionCreate", async interaction => {
                 .setStyle(ButtonStyle.Secondary)
         );
 
-        const channel = await client.channels.fetch(channelId);
-        const msg = await channel.send({
-            embeds: [embed],
-            components: [row]
-        });
+        try {
+            const channel = await client.channels.fetch(channelId);
+            const msg = await channel.send({
+                embeds: [embed],
+                components: [row]
+            });
 
-        products[productName].messageId = msg.id;
-        saveProducts();
+            products[productName].messageId = msg.id;
+            saveProducts();
 
-        await interaction.reply({
-            content: "Restock Created ✅",
-            ephemeral: true
-        });
+            await interaction.editReply("Restock Created Successfully ✅");
+        } catch (err) {
+            console.error(err);
+            await interaction.editReply("Error: Channel not found or no permission ❌");
+        }
     }
 
     /* ===== BUTTONS ===== */
     if (interaction.isButton()) {
-
         if (interaction.customId.startsWith("buy_")) {
-            const buyChannel = await client.channels.fetch(BUY_CHANNEL_ID);
+            const buyChannel = await client.channels.fetch(BUY_CHANNEL_ID).catch(() => null);
             return interaction.reply({
-                content: `Please go to ${buyChannel} to complete your purchase.`,
+                content: buyChannel 
+                    ? `Please go to ${buyChannel} to complete your purchase.`
+                    : "Buy channel not found.",
                 ephemeral: true
             });
         }
 
         if (interaction.customId.startsWith("edit_")) {
-
-            if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator))
+            if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
                 return interaction.reply({ content: "Admin only ❌", ephemeral: true });
+            }
 
             const productName = interaction.customId.replace("edit_", "");
+            if (!products[productName]) {
+                return interaction.reply({ content: "Product not found ❌", ephemeral: true });
+            }
 
             const modal = new ModalBuilder()
                 .setCustomId(`edit_modal_${productName}`)
-                .setTitle("Edit Stock");
+                .setTitle(`Edit Stock → ${productName}`);
 
             const stockInput = new TextInputBuilder()
                 .setCustomId("variants")
                 .setLabel("Variants (Name,Price,Stock per line)")
                 .setStyle(TextInputStyle.Paragraph)
+                .setValue(
+                    products[productName].variants
+                        .map(v => `${v.name},${v.price},${v.stock}`)
+                        .join("\n")
+                )
                 .setRequired(true);
 
             modal.addComponents(new ActionRowBuilder().addComponents(stockInput));
+
             await interaction.showModal(modal);
         }
     }
 
-    /* ===== EDIT STOCK ===== */
+    /* ===== EDIT MODAL SUBMIT ===== */
     if (interaction.isModalSubmit() && interaction.customId.startsWith("edit_modal_")) {
+        await interaction.deferReply({ ephemeral: true });
 
         const productName = interaction.customId.replace("edit_modal_", "");
-        const variantInput = interaction.fields.getTextInputValue("variants");
+        if (!products[productName]) {
+            return interaction.editReply("Product not found ❌");
+        }
 
-        const parsedVariants = variantInput.split("\n").map(line => {
-            const [name, price, stock] = line.split(",");
-            return {
-                name: name.trim(),
-                price: price.trim(),
-                stock: parseInt(stock.trim())
-            };
-        });
+        const variantInput = interaction.fields.getTextInputValue("variants");
+        const parsedVariants = variantInput
+            .split("\n")
+            .map(line => line.trim())
+            .filter(line => line)
+            .map(line => {
+                const [name, price, stockStr] = line.split(",").map(p => p.trim());
+                const stock = parseInt(stockStr);
+                return {
+                    name: name || "Unknown",
+                    price: price || "€0.00",
+                    stock: isNaN(stock) ? 0 : stock
+                };
+            });
 
         products[productName].variants = parsedVariants;
         saveProducts();
 
         const embed = generateEmbed(productName);
+        const channel = await client.channels.fetch(products[productName].channelId).catch(() => null);
 
-        const channel = await client.channels.fetch(products[productName].channelId);
-        const message = await channel.messages.fetch(products[productName].messageId);
-
-        await message.edit({ embeds: [embed] });
-
-        await interaction.reply({
-            content: "Stock Updated ✅",
-            ephemeral: true
-        });
+        if (channel && products[productName].messageId) {
+            try {
+                const message = await channel.messages.fetch(products[productName].messageId);
+                await message.edit({ embeds: [embed] });
+                await interaction.editReply("Stock Updated ✅");
+            } catch (err) {
+                console.error(err);
+                await interaction.editReply("Stock updated, but couldn't edit old message.");
+            }
+        } else {
+            await interaction.editReply("Stock updated, but message/channel not found.");
+        }
     }
 });
 
-/* ================= EMBED ================= */
-
-function generateEmbed(productName) {
-
-    const product = products[productName];
-
-    let description = "Our product **" + productName + "** has just been restocked!\n\n";
-
-    description += "```";
-    description += "\nVariant                Price   Stock\n";
-    description += "-------------------------------------\n";
-
-    product.variants.forEach(function(v) {
-
-        // Hard limit name length to prevent wrapping
-        let cleanName = v.name.length > 20 
-            ? v.name.substring(0, 17) + "..."
-            : v.name;
-
-        const name = cleanName.padEnd(22, " ");
-        const price = v.price.toString().padEnd(8, " ");
-        const stock = v.stock.toString();
-
-        description += name + price + stock + "\n";
-    });
-
-    description += "```";
-
-    return new EmbedBuilder()
-        .setColor("#00b0f4")
-        .setTitle(productName)
-        .setDescription(description)
-        .setImage(product.image)
-        .setFooter({ text: "Tec Trader" })
-        .setTimestamp();
-}
-
 client.once("ready", () => {
-    console.log(`Logged in as ${client.user.tag}`);
+    console.log(`Logged in as ${client.user.tag} | Ready to restock!`);
 });
 
 process.on("unhandledRejection", console.error);
