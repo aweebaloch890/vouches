@@ -235,10 +235,13 @@ function generateEmbed(productName) {
     let description = "Our product **" + productName + "** has just been restocked!\n\n";
 
     product.variants.forEach(function(v) {
+
         description += "```";
-        description += "\nVariant                              Price        Stock\n\n";
-        description += v.name.padEnd(35, " ") + v.price.padEnd(12, " ") + v.stock;
+        description += "\n" + v.name;
+        description += "\nPrice: " + v.price;
+        description += "\nStock: " + v.stock;
         description += "\n```\n\n";
+
     });
 
     return new EmbedBuilder()
