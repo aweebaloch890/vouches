@@ -231,24 +231,26 @@ client.on("interactionCreate", async interaction => {
 function generateEmbed(productName) {
 
     const product = products[productName];
-
     let description = "Our product **" + productName + "** has just been restocked!\n\n";
-
-    description += "```";
-    description += "\nVariant                          Price      Stock\n";
-    description += "-------------------------------------------------------\n";
 
     product.variants.forEach(function(v) {
 
-        const name = v.name.padEnd(32, " ");
-        const price = v.price.toString().padEnd(10, " ");
+        description += "```";
+
+        // Header
+        description += "\n";
+        description += "Variant                                 Price      Stock\n";
+        description += "\n";
+
+        // Proper fixed spacing
+        const name = v.name.padEnd(40, " ");
+        const price = v.price.toString().padEnd(11, " ");
         const stock = v.stock.toString();
 
-        description += name + price + stock + "\n";
+        description += name + price + stock;
 
+        description += "\n```" + "\n\n";
     });
-
-    description += "```\n";
 
     return new EmbedBuilder()
         .setColor("#00b0f4")
