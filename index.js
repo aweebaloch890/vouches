@@ -237,19 +237,18 @@ function generateEmbed(productName) {
 
         description += "```";
 
-        // Header
-        description += "\n";
-        description += "Variant                                 Price      Stock\n";
-        description += "\n";
+        // Compact header (mobile safe width)
+        description += "\nVariant                     Price   Stock\n";
+        description += "----------------------------------------------\n";
 
-        // Proper fixed spacing
-        const name = v.name.padEnd(40, " ");
-        const price = v.price.toString().padEnd(11, " ");
+        // Controlled spacing (IMPORTANT: do not increase numbers)
+        const name = v.name.padEnd(26, " ");
+        const price = v.price.toString().padEnd(8, " ");
         const stock = v.stock.toString();
 
         description += name + price + stock;
 
-        description += "\n```" + "\n\n";
+        description += "\n```\n\n";
     });
 
     return new EmbedBuilder()
