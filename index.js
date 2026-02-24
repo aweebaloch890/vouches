@@ -38,19 +38,20 @@ function generateEmbed(productName) {
     const data = products[productName];
     if (!data) return new EmbedBuilder().setDescription("Product not found");
 
-    const embed = new EmbedBuilder()
-        .setColor(0x00FF00)                     // Green restock vibe
-        .setTitle(`${productName} Restocked! 🔥`)
-        .setURL("https://forceshop.cc/FORCESHOP")   // ← yahan apna real buy link daal sakta hai
-        .setDescription(
-            `Our product **${productName}** has just been **restocked**!\n` +
-            `Jaldi se grab kar lo – stock limited hai! 🚀\n\n` +
-            `**Buy Now →** https://forceshop.cc/FORCESHOP`
-        )
+const embed = new EmbedBuilder()
+    .setColor(0x00FF00)                     // Green restock vibe
+    .setTitle(`${productName} Restocked! 🔥`)  // Yeh title clickable ban jayega
+    .setURL("https://discord.com/channels/1337111106971504661/1337266092812406844")   // ← YAHAN TERA TICKET/BUY CHANNEL LINK DAAL
+    .setDescription(
+        `Our product **${productName}** has just been **restocked**!\n` +
+        `Jaldi se grab kar lo – stock limited hai! 🚀\n\n` +
+        `**Buy Now / Open Ticket →** Click the title above!`  // Description mein guide kar do
+    )
+    // ... baaki sab same (image, thumbnail, fields etc.)
         .setImage(data.image)                   // Product ki badi image (modal se aati hai)
-        .setThumbnail("https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png") // Optional
+        .setThumbnail("https://cdn.discordapp.com/attachments/1337788828051701873/1475668721010741248/tec_trader-removebg-preview_1.png?ex=699e5317&is=699d0197&hm=37d665b4b3668fb0e577a6badf710ef8076ff4e6d6c76bb2e222d484891b1155&") // Optional
         .setFooter({ 
-            text: "Force Shop • Restock Alert", 
+            text: "Tec Trader • Restock Alert", 
             iconURL: client.user.displayAvatarURL() 
         })
         .setTimestamp();
